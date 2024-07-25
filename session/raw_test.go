@@ -1,17 +1,14 @@
-package main
+package session
 
 import (
-	_ "github.com/mattn/go-sqlite3"
+	"testing"
 
-	"orm"
 	"orm/log"
 )
 
-func main() {
-	engine, _ := orm.NewEngine("sqlite3", "orm.db")
-	defer engine.Close()
+func TestSessionRawExec(t *testing.T) {
+	s := NewSession()
 
-	s := engine.NewSession()
 	_, _ = s.Raw("DROP TABLE IF EXISTS User;").Exec()
 	_, _ = s.Raw("CREATE TABLE User(Name text);").Exec()
 	_, _ = s.Raw("CREATE TABLE User(Name text);").Exec()
