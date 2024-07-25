@@ -1,0 +1,3 @@
+fmt:
+	go fmt ./...
+	goimports -local orm -w .
