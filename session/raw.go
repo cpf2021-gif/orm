@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"strings"
 
+	"orm/clause"
 	"orm/dialect"
 	"orm/log"
 	"orm/schema"
@@ -16,6 +17,8 @@ type Session struct {
 
 	dialect  dialect.Dialect
 	refTable *schema.Schema
+
+	clause clause.Clause
 }
 
 func New(db *sql.DB, dialect dialect.Dialect) *Session {
@@ -28,6 +31,7 @@ func New(db *sql.DB, dialect dialect.Dialect) *Session {
 func (s *Session) Clear() {
 	s.sql.Reset()
 	s.sqlVars = nil
+	s.clause = clause.Clause{}
 }
 
 func (s *Session) DB() *sql.DB {
