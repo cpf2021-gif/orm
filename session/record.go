@@ -57,6 +57,64 @@ func (s *Session) Find(vals interface{}) error {
 	}
 	return rows.Close()
 }
+
+func (s *Session) Update(kv ...interface{}) (int64, error) {
+	m, ok := kv[0].(map[string]interface{})
+	if !ok {
+		m = make(map[string]interface{})
+		if len(kv)%2 != 0 {
+			return 0, errors.New("kv invaild")
+		}
+		for i := 0; i < len(kv); i += 2 {
+			m[kv[i].(string)] = kv[i+1]
+		}
+	}
+
+	table := s.RefTable()
+	if table == nil || table.Name == "" {
+		return 0, errors.New("no set model")
+	}
+
+	s.clause.Set(clause.UPDATE, table.Name, m)
+	sql, vars := s.clause.Build(clause.UPDATE, clause.WHERE)
+	result, err := s.Raw(sql, vars...).Exec()
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+func (s *Session) Delete() (int64, error) {
+	table := s.RefTable()
+	if table == nil || table.Name == "" {
+		return 0, errors.New("no set model")
+	}
+
+	s.clause.Set(clause.DELETE, table.Name)
+	sql, vars := s.clause.Build(clause.DELETE, clause.WHERE)
+	result, err := s.Raw(sql, vars...).Exec()
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+func (s *Session) Count() (int64, error) {
+	table := s.RefTable()
+	if table == nil || table.Name == "" {
+		return 0, errors.New("no set model")
+	}
+
+	s.clause.Set(clause.COUNT, table.Name)
+	sql, vars := s.clause.Build(clause.COUNT, clause.WHERE)
+	row := s.Raw(sql, vars...).QueryRow()
+	var tmp int64
+	if err := row.Scan(&tmp); err != nil {
+		return 0, err
+	}
+	return tmp, nil
+}
+
 func (s *Session) Limit(num int) *Session {
 	s.clause.Set(clause.LIMIT, num)
 	return s
@@ -73,3 +131,15 @@ func (s *Session) OrderBy(desc string) *Session {
 	return s
 }
 
+func (s *Session) First(value interface{}) error {
+	dest := reflect.Indirect(reflect.ValueOf(value))
+	destSlice := reflect.New(reflect.SliceOf(dest.Type())).Elem()
+	if err := s.Limit(1).Find(destSlice.Addr().Interface()); err != nil {
+		return err
+	}
+	if destSlice.Len() == 0 {
+		return errors.New("NOT FOUND")
+	}
+	dest.Set(destSlice.Index(0))
+	return nil
+}

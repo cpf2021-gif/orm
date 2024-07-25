@@ -17,6 +17,9 @@ func init() {
 	generators[LIMIT] = limitClause
 	generators[WHERE] = whereClause
 	generators[ORDERBY] = orderbyClause
+	generators[UPDATE] = updateClause
+	generators[DELETE] = deleteClause
+	generators[COUNT] = countClause
 }
 
 func genBindVars(num int) string {
@@ -75,4 +78,25 @@ func whereClause(vals ...interface{}) (string, []interface{}) {
 func orderbyClause(vals ...interface{}) (string, []interface{}) {
 	// ORDER BY
 	return fmt.Sprintf("ORDER BY %s", vals[0]), []interface{}{}
+}
+
+func updateClause(vals ...interface{}) (string, []interface{}) {
+	tableName := vals[0]
+	m := vals[1].(map[string]interface{})
+
+	var keys []string
+	var vars []interface{}
+	for k, v := range m {
+		keys = append(keys, k+" = ?")
+		vars = append(vars, v)
+	}
+	return fmt.Sprintf("UPDATE %v SET %s", tableName, strings.Join(keys, ", ")), vars
+}
+
+func deleteClause(vals ...interface{}) (string, []interface{}) {
+	return fmt.Sprintf("DELETE FROM %v", vals[0]), []interface{}{}
+}
+
+func countClause(vals ...interface{}) (string, []interface{}) {
+	return selectClause(vals[0], []string{"count(*)"})
 }
