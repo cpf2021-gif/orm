@@ -19,6 +19,7 @@ func (s *Session) Insert(vals ...interface{}) (int64, error) {
 	table = s.Model(vals[0]).RefTable()
 
 	for _, value := range vals {
+		s.CallMethod(BeforeInsert, value)
 		s.clause.Set(clause.INSERT, table.Name, table.FieldNames)
 		recordValues = append(recordValues, table.RecordValues(value))
 	}
@@ -29,6 +30,7 @@ func (s *Session) Insert(vals ...interface{}) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	s.CallMethod(AfterInsert, vals[0])
 	return result.RowsAffected()
 }
 
@@ -36,6 +38,8 @@ func (s *Session) Find(vals interface{}) error {
 	destSlice := reflect.Indirect(reflect.ValueOf(vals))
 	destType := destSlice.Type().Elem()
 	table := s.Model(reflect.New(destType).Elem().Interface()).RefTable()
+
+	s.CallMethod(BeforeQuery, reflect.New(destType).Elem().Addr().Interface())
 
 	s.clause.Set(clause.SELECT, table.Name, table.FieldNames)
 	sql, vars := s.clause.Build(clause.SELECT, clause.WHERE, clause.ORDERBY, clause.LIMIT)
@@ -53,6 +57,8 @@ func (s *Session) Find(vals interface{}) error {
 		if err := rows.Scan(values...); err != nil {
 			return err
 		}
+
+		s.CallMethod(AfterQuery, dest.Addr().Interface())
 		destSlice.Set(reflect.Append(destSlice, dest))
 	}
 	return rows.Close()
