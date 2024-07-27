@@ -10,8 +10,15 @@ import (
 	"orm/schema"
 )
 
+type CommonDB interface {
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	QueryRow(query string, args ...interface{}) *sql.Row
+	Exec(query string, args ...interface{}) (sql.Result, error)
+}
+
 type Session struct {
 	db      *sql.DB
+	tx      *sql.Tx
 	sql     strings.Builder
 	sqlVars []interface{}
 
@@ -28,14 +35,17 @@ func New(db *sql.DB, dialect dialect.Dialect) *Session {
 	}
 }
 
+func (s *Session) DB() CommonDB {
+	if s.tx != nil {
+		return s.tx
+	}
+	return s.db
+}
+
 func (s *Session) Clear() {
 	s.sql.Reset()
 	s.sqlVars = nil
 	s.clause = clause.Clause{}
-}
-
-func (s *Session) DB() *sql.DB {
-	return s.db
 }
 
 func (s *Session) Raw(sql string, values ...interface{}) *Session {

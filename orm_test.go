@@ -1,0 +1,68 @@
+package orm
+
+import (
+	"errors"
+	"testing"
+
+	"orm/session"
+
+	_ "github.com/mattn/go-sqlite3"
+)
+
+func OpenDB(t *testing.T) *Engine {
+	t.Helper()
+	engine, err := NewEngine("sqlite3", "orm.db")
+	if err != nil {
+		t.Fatal("failed to connect", err)
+	}
+	return engine
+}
+
+type User struct {
+	Name string `orm:"PRIMARY KEY"`
+	Age  int
+}
+
+func TestEngineTranscation(t *testing.T) {
+	t.Run("rollback", func(t *testing.T) {
+		transactionRollback(t)
+	})
+
+	t.Run("commit", func(t *testing.T) {
+		transactionCommit(t)
+	})
+}
+
+func transactionRollback(t *testing.T) {
+	engine := OpenDB(t)
+	defer engine.Close()
+	s := engine.NewSession()
+	_ = s.Model(&User{}).DropTable()
+	_, err := engine.Transaction(func(s *session.Session) (interface{}, error) {
+		_ = s.Model(&User{}).CreateTable()
+		_, _ = s.Insert(&User{Name: "Tom", Age: 18})
+		return nil, errors.New("Error")
+	})
+
+	if err == nil || s.HasTable() {
+		t.Fatal("failed to rollback")
+	}
+}
+
+func transactionCommit(t *testing.T) {
+	engine := OpenDB(t)
+	defer engine.Close()
+	s := engine.NewSession()
+	_ = s.Model(&User{}).DropTable()
+	_, err := engine.Transaction(func(s *session.Session) (interface{}, error) {
+		_ = s.Model(&User{}).CreateTable()
+		_, _ = s.Insert(&User{Name: "Tom", Age: 18})
+		return nil, nil
+	})
+
+	count, _ := s.Model(&User{}).Count()
+
+	if err != nil || !s.HasTable() || count != 1 {
+		t.Fatal("failed to commit")
+	}
+}
