@@ -8,29 +8,48 @@ import (
 	"orm/schema"
 )
 
-func (s *Session) Insert(vals ...interface{}) (int64, error) {
+// Insert(&User{}) or Insert([]&User{})
+func (s *Session) Insert(val interface{}) (int64, error) {
 	recordValues := make([]interface{}, 0)
+
+	reflectValue := reflect.ValueOf(val)
+	for reflectValue.Kind() == reflect.Ptr {
+		reflectValue = reflectValue.Elem()
+	}
 
 	var table *schema.Schema
 
-	if len(vals) == 0 {
-		return 0, errors.New("no data to insert")
+	if reflectValue.Kind() == reflect.Slice {
+		for i := 0; i < reflectValue.Len(); i++ {
+			if i == 0 {
+				table = s.Model(reflectValue.Index(i).Interface()).RefTable()
+			}
+			s.CallMethod(BeforeInsert, reflectValue.Index(i).Interface())
+			recordValues = append(recordValues, table.RecordValues(reflectValue.Index(i).Interface()))
+		}
+	} else if reflectValue.Kind() == reflect.Struct {
+		table = s.Model(val).RefTable()
+		s.CallMethod(BeforeInsert, val)
+		recordValues = append(recordValues, table.RecordValues(val))
+	} else {
+		return 0, errors.New("unsupported type")
 	}
-	table = s.Model(vals[0]).RefTable()
 
-	for _, value := range vals {
-		s.CallMethod(BeforeInsert, value)
-		s.clause.Set(clause.INSERT, table.Name, table.FieldNames)
-		recordValues = append(recordValues, table.RecordValues(value))
-	}
-
+	s.clause.Set(clause.INSERT, table.Name, table.FieldNames)
 	s.clause.Set(clause.VALUES, recordValues...)
 	sql, vars := s.clause.Build(clause.INSERT, clause.VALUES)
 	result, err := s.Raw(sql, vars...).Exec()
 	if err != nil {
 		return 0, err
 	}
-	s.CallMethod(AfterInsert, vals[0])
+
+	if reflectValue.Kind() == reflect.Slice {
+		for i := 0; i < reflectValue.Len(); i++ {
+			s.CallMethod(AfterInsert, reflectValue.Index(i).Interface())
+		}
+	} else {
+		s.CallMethod(AfterInsert, val)
+	}
 	return result.RowsAffected()
 }
 

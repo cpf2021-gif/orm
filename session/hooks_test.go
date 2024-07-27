@@ -36,7 +36,7 @@ func TestSessionCallMethod(t *testing.T) {
 	s := NewSession().Model(&Account{})
 	_ = s.DropTable()
 	_ = s.CreateTable()
-	_, _ = s.Insert(&Account{1, "123456"}, &Account{2, "qwerty"})
+	_, _ = s.Insert([]*Account{{1, "123456"}, {2, "qwerty"}})
 
 	u := &Account{}
 
