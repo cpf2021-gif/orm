@@ -2,6 +2,7 @@ package orm
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"orm/session"
@@ -87,5 +88,22 @@ func aliasTableNames(t *testing.T) {
 
 	if s.RefTable().Name != "users" || !s.HasTable() {
 		t.Fatal("failed to alias table name")
+	}
+}
+
+func TestEngineMigrate(t *testing.T) {
+	engine := OpenDB(t)
+	defer engine.Close()
+	s := engine.NewSession()
+	_, _ = s.Raw("drop table if exists users;").Exec()
+	_, _ = s.Raw("CREATE TABLE users(Name text PRIMARY KEY, XXX integer);").Exec()
+	_, _ = s.Raw("INSERT INTO users(`Name`) values (?), (?)", "Tom", "Sam").Exec()
+
+	engine.Migrate(&User{})
+
+	rows, _ := s.Raw("SELECT * FROM users").QueryRows()
+	cols, _ := rows.Columns()
+	if !reflect.DeepEqual(cols, []string{"Name", "Age"}) {
+		t.Fatal("Failed to migrate table User, got columns", cols)
 	}
 }
